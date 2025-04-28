@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Search Form -->
+    <div class="row mb-4">
+        <div class="col-md-8 mx-auto">
+            <form method="GET" action="{{ url_for('recipes') }}" class="d-flex">
+                {{ form.csrf_token }}
+                <input type="text" name="query" class="form-control me-2" placeholder="Поиск рецептов..." value="{{ request.args.get('query', '') }}">
+                <select name="cuisine" class="form-select me-2" style="width: auto;">
+                    {% for value, label in form.cuisine.choices %}
+                        <option value="{{ value }}" {% if value|string == request.args.get('cuisine', '0') %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Поиск</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recipes Grid -->
+    <div class="row">
+        {% if recipes.items %}
+            {% for recipe in recipes.items %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        {% if recipe.image_url %}
+                            <img src="{{ recipe.image_url }}" class="card-img-top" alt="{{ recipe.title }}" style="height: 200px; object-fit: cover;">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ recipe.title }}</h5>
+                            <p class="card-text">{{ recipe.description[:100] }}{% if recipe.description|length > 100 %}...{% endif %}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">{{ recipe.cuisine.name }}</small>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('recipe_detail', recipe_id=recipe.id) }}" class="btn btn-sm btn-outline-primary">Подробнее</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12 text-center py-5">
+                <h3>Рецепты не найдены</h3>
+                <p class="text-muted">Попробуйте изменить параметры поиска</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if recipes.pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if recipes.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('recipes', page=recipes.prev_num, cuisine=request.args.get('cuisine', ''), query=request.args.get('query', '')) }}">
+                            Предыдущая
+                        </a>
+                    </li>
+                {% endif %}
+
+                {% for page_num in recipes.iter_pages(left_edge=2, left_current=2, right_current=2, right_edge=2) %}
+                    {% if page_num %}
+                        <li class="page-item {% if page_num == recipes.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('recipes', page=page_num, cuisine=request.args.get('cuisine', ''), query=request.args.get('query', '')) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if recipes.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('recipes', page=recipes.next_num, cuisine=request.args.get('cuisine', ''), query=request.args.get('query', '')) }}">
+                            Следующая
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Обработка нажатия на кнопку "Добавить в избранное"
+        const favoriteButtons = document.querySelectorAll('.btn-favorite');
+        favoriteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const recipeId = this.getAttribute('data-recipe-id');
+                fetch(`/toggle_favorite/${recipeId}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        this.classList.toggle('active');
+                        const icon = this.querySelector('i');
+                        icon.classList.toggle('fas');
+                        icon.classList.toggle('far');
+                        showToast(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}
